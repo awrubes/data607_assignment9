@@ -1,0 +1,86 @@
+---
+title: "Data607_Assignment9"
+author: "aw"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment 9: Web APIs
+
+For this assignment, I'll use the NYT API to show how to interact with web API's through an R interface. For more information on the NYT API you can refer to \<<https://developer.nytimes.com/docs/books-product/1/overview>\>. For this particular assignment, I will be retrieving data on the NYT bestseller list for hardcover fiction books.
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(httr2)
+library(jsonlite)
+```
+
+## GET request
+
+GET is an HTTP method that lets you retrieve data from the internet. A successful GET request will return data that can then be parsed using R. The basic structure of GET request:
+
+**Define the endpoint:** A url that is used to connect to the API. Mostly you will need to pass a unique key or token either in the url or within the JSON body being passed to the API. This token will authenticate your request. If the token is incorrect or missing, you will receive a 500 error code.
+
+**Make the GET request**: GET HTTP method will let you establish a connection to an API and retrieve whatever data is requested. There are a host of other HTTP methods the most popular, excluding GET, being POST and PUT.
+
+**Check the response:** every function that employs an HTTP method should always include some conditional logic that checks the status of the request. Depending on the status code (200, 400, 500) the request was either successful or unsuccessful. If unsuccessful, a developer can use the error code to determine what might be the cause of the issue.
+
+**Parse the JSON content:** Finally, the data will mostly be returned in a messy binary format which will need to be converted to a more readable dataframe.
+
+```{r data_retrieve}
+
+#create a reusable base url that can be used with other keys
+base_url <- 'https://api.nytimes.com/svc/books/v3/lists/'
+
+#append to base url to access hardcover fiction books
+info_url <- 'current/hardcover-fiction.json?api-key=dlj6gAcTdtsvIwV1vgv8qKiKvJYa82wB'
+
+#combine url's
+full_url <- base::paste0(base_url,info_url)
+
+#make GET request
+api_call <- httr::GET(full_url)
+
+#check status of request. if 200, then request is successful! 
+if(httr::status_code(api_call) == 200){
+  #convert from hexidecimal to readable character-string format
+  api_char <- base::rawToChar(api_call$content)
+
+  #take character-strings and convert into R list, flatten to ensure column creation
+  api_JSON <- jsonlite::fromJSON(api_char, flatten=TRUE)
+
+  #create dataframe var to store data
+  df <- as.data.frame(api_JSON$results$books)
+  glimpse(df)
+} else{
+  print(paste("Request failed with status code:", httr::status_code(api_call)))
+}
+
+
+```
+
+## Exploring the data
+
+Now that we have a usable dataframe, we can manipulate and analyze the data. For instance, let's see how many publishers have multiple books on the bestseller fiction list. We can also sort the dataframe by number of weeks on the list.
+
+```{r analysis}
+
+#get publisher count to see if there are any repeats
+df_publisher <- df %>%
+  count(publisher) %>%
+  arrange(desc(n))
+
+print(df_publisher)
+
+#sort dataframe by number of weeks on bestseller list
+df_sorted <- df %>%
+  arrange(desc(weeks_on_list))
+
+glimpse(df_sorted)
+
+```
